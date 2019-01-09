@@ -157,7 +157,7 @@ class LTPLE_Inbox_Settings {
 		
 		// add in user contents
 		
-		//$this->parent->settings->tabs['user-contents']['addon-post-type-here'] = array( 'name' => 'Tab name here');
+		$this->parent->settings->tabs['user-contents']['user-message'] = array( 'name' => 'Messages');
 		
 		// add in gallery settings
 		
