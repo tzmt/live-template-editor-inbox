@@ -163,6 +163,10 @@ class LTPLE_Inbox {
 		add_filter( 'ltple_user_plan_option_total', array( $this, 'add_user_plan_option_total'),10,2);
 		add_filter( 'ltple_user_plan_info', array( $this, 'add_user_plan_info'),10,1);
 		
+		add_filter( 'ltple_one_time_payment', array( $this, 'handle_sponsorship_payment'));
+		
+		$this->add_star_triggers();
+
 		// addon post types
 		
 		$this->parent->register_post_type( 'user-message', __( 'User Message', 'live-template-editor-inbox' ), __( 'User Messages', 'live-template-editor-inbox' ), '', array(
@@ -238,6 +242,90 @@ class LTPLE_Inbox {
 		);
 	}
 	
+	public function send_message($from_user,$to_user,$message,$time=null,$status='publish'){
+							
+		// get contact ids
+		
+		$emails = array($from_user->user_email,$to_user->user_email);
+		
+		// get time
+		
+		if( is_null($time) ){
+			
+			$time = time();
+		}
+		
+		if( $contact_ids = $this->get_user_contact_ids($emails) ){
+			
+			//get parent conversation
+			
+			$conversation = $this->start_conversation($contact_ids,$status);
+			
+			if( !empty($conversation['id']) ){
+			
+				$post_title = md5(json_encode($contact_ids).$message.$time);
+				
+				require_once( ABSPATH . 'wp-admin/includes/post.php' );
+			
+				if( !$post_id = post_exists( $post_title )){
+				
+					if( $post_id = wp_insert_post(array(
+					
+						'post_title' 	=> $post_title,
+						'post_type' 	=> 'user-message',
+						'post_content' 	=> $message,
+						'post_status' 	=> 'publish',
+						'post_parent' 	=> $conversation['id'],
+						'post_author' 	=> $from_user->ID,
+						
+					))){
+						
+						// set user contacts
+						
+						wp_set_post_terms( $post_id, $contact_ids, 'user-contact', false );
+						
+						// mark sender conversation
+						
+						$this->mark_conversation_as_read($conversation['id'],$from_user->ID);
+						
+						// mark recipient conversation
+						
+						$this->mark_conversation_as_unread($conversation['id'],$to_user->ID);
+						
+						if( $status == 'pending' ){
+							
+							// output message
+						
+							return '<div class="alert alert-success">Your message will be transmitted to '.ucfirst($to_user->nickname).' after confirmation of your email. Please check your inbox.</div>';														
+						}
+						else{
+						
+							// notify recipient
+
+							$this->schedule_recipient_notification($from_user,$to_user,$conversation['id'],$message);
+						
+							// output message
+						
+							return '<div class="alert alert-success">Your message was transmitted to '.ucfirst($to_user->nickname).' thanks!</div>';
+						}
+					}
+					else{
+						
+						return '<div class="alert alert-danger">Error creating new message...</div>';
+					}
+				}
+			}
+			else{
+				
+				return '<div class="alert alert-danger">Error retrieving the conversation...</div>';
+			}
+		}
+		else{
+			
+			return '<div class="alert alert-danger">Error getting the contact ids...</div>';
+		}	
+	}
+	
 	public function handle_send_message(){	 
 		
 		if( $this->parent->profile->id > 0 && $this->parent->profile->tab == 'contact-me' ){
@@ -292,7 +380,7 @@ class LTPLE_Inbox {
 						
 						if($valid_request){
 
-							if( !empty($from_email) && !empty($from_nickname) ){
+							if( !empty($from_email) ){
 								
 								$status = 'publish';
 								
@@ -327,83 +415,9 @@ class LTPLE_Inbox {
 								
 								if( !empty($from_user->ID) ){
 									
-									// get contact ids
+									//send message
 									
-									$emails = array($from_email,$to_email);
-									
-									if( $contact_ids = $this->get_user_contact_ids($emails) ){
-										
-										//get parent conversation
-										
-										$conversation = $this->start_conversation($contact_ids,$status);
-										
-										if( !empty($conversation['id']) ){
-										
-											$post_title = md5(json_encode($contact_ids).$message.$time);
-											
-											require_once( ABSPATH . 'wp-admin/includes/post.php' );
-										
-											if( !$post_id = post_exists( $post_title )){
-											
-												if( $post_id = wp_insert_post(array(
-												
-													'post_title' 	=> $post_title,
-													'post_type' 	=> 'user-message',
-													'post_content' 	=> $message,
-													'post_status' 	=> 'publish',
-													'post_parent' 	=> $conversation['id'],
-													'post_author' 	=> $from_user->ID,
-													
-												))){
-													
-													// set user contacts
-													
-													wp_set_post_terms( $post_id, $contact_ids, 'user-contact', false );
-													
-													// mark sender conversation
-													
-													$this->mark_conversation_as_read($conversation['id'],$from_user->ID);
-													
-													// mark recipient conversation
-													
-													$this->mark_conversation_as_unread($conversation['id'],$to_user->ID);
-																																					
-													if( $status == 'pending' ){
-														
-														// output message
-													
-														$this->parent->message .= '<div class="alert alert-success">Your message will be transmitted to '.ucfirst($to_user->nickname).' after confirmation of your email. Please check your inbox.</div>';														
-													}
-													else{
-													
-														// notify recipient
-
-														$this->schedule_recipient_notification($from_user,$to_user,$conversation['id'],$message);
-													
-														// output message
-													
-														$this->parent->message .= '<div class="alert alert-success">Your message was transmitted to '.ucfirst($to_user->nickname).' thanks!</div>';
-													}
-												}
-												else{
-													
-													$this->parent->message .= '<div class="alert alert-danger">Error creating new message...</div>';
-												}
-											}
-											else{
-												
-												//$this->parent->message .= '<div class="alert alert-warning">This message was already sent</div>';
-											}
-										}
-										else{
-											
-											$this->parent->message .= '<div class="alert alert-danger">Error retrieving the conversation...</div>';
-										}
-									}
-									else{
-										
-										$this->parent->message .= '<div class="alert alert-danger">Error getting the contact ids...</div>';
-									}
+									$this->parent->message .= $this->send_message($from_user,$to_user,$message,$time,$status);
 								}
 								else{
 									
@@ -440,6 +454,8 @@ class LTPLE_Inbox {
 				// get sender message
 				
 				$message = $_POST[$key.'message'];
+				
+				$message = strip_shortcodes( $message );
 				
 				// get send time
 				
@@ -578,8 +594,10 @@ class LTPLE_Inbox {
 			));
 			
 			wp_set_post_terms( $conversation['id'], $contact_ids, 'user-contact', false );
+		
+			do_action('ltple_new_conversation_started');
 		}
-
+		
 		return $conversation;
 	}
 	
@@ -886,6 +904,8 @@ class LTPLE_Inbox {
 		
 		$content = preg_replace('/((http|https):\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;:\/~+#-]*[\w@?^=%&amp;\/~+#-])?)/', '<a target="_blank" href="\1">\1</a>', $content);
 		
+		$content = do_shortcode($content);
+		
 		return $content;
 	}
 	
@@ -1063,17 +1083,26 @@ class LTPLE_Inbox {
 		
 		if( $terms = wp_get_post_terms($conversation_id,'user-contact') ){
 			
+			$count = count($terms);
+			
 			foreach( $terms as  $term ){
 				
 				$email = $term->name;
 				
-				if( empty( $this->users[$email]) ){
+				if( !isset( $this->users[$email]) ){
 				
-					$user = get_user_by('email',$email);
-					
-					$user->avatar = $this->parent->image->get_avatar_url($user->ID);
-					
-					$this->users[$email] = $user;
+					if( $user = get_user_by('email',$email) ){
+
+						$user->avatar = $this->parent->image->get_avatar_url($user->ID);
+						
+						$this->users[$email] = $user;						
+					}
+					elseif( $count == 2 ){
+						
+						// one member was deleted
+						
+						return false;
+					}
 				}
 				
 				$members[$email] = $this->users[$email];
@@ -1101,7 +1130,8 @@ class LTPLE_Inbox {
 			
 			if( empty($message->post_excerpt) ){
 				
-				$excerpt 		= strip_shortcodes( $message->post_content );
+				$excerpt 		= $this->parse_message_content($message->post_content);
+				//$excerpt 		= strip_shortcodes( $message->post_content );
 				$excerpt 		= apply_filters( 'the_content', $excerpt );
 				$excerpt 		= str_replace(']]>', ']]&gt;', $excerpt);
 				
@@ -1304,7 +1334,7 @@ class LTPLE_Inbox {
 			
 			// get tab position
 			
-			$this->parent->profile->tabs['contact-me']['position'] = 3;
+			$this->parent->profile->tabs['contact-me']['position'] = 4;
 			
 			// get tab name
 			
@@ -1569,6 +1599,32 @@ class LTPLE_Inbox {
 	public function handle_subscription_plan(){
 				
 		
+	}
+	
+	public function handle_sponsorship_payment(){
+		
+		if( !empty($this->parent->plan->data['sponsored']) ){
+			
+			if( $to_user = get_user_by('email',$this->parent->plan->data['sponsored']) ){
+			
+				if( $this->parent->plan->data['fee'] > 0 ){
+					
+					$message = '[ltple-sponsorship-notification currency=\''.$this->parent->plan->data['currency'].'\' fee=\''.$this->parent->plan->data['fee'].'\']';
+					
+					$this->send_message($this->parent->user,$to_user,$message);
+				}
+			}
+		}
+	}
+	
+	public function add_star_triggers(){
+
+		$this->parent->stars->triggers['inbox interaction']['ltple_new_conversation_started'] = array(
+				
+			'description' => 'when you start a new conversation with someone'
+		);	
+
+		return true;
 	}
 	
 	public function add_user_plan_option_total( $user_id, $options ){
