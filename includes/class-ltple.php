@@ -809,6 +809,8 @@ class LTPLE_Inbox {
 	
 	public function get_panel_shortcode(){
 		
+		include($this->parent->views . '/navbar.php');
+		
 		if($this->parent->user->loggedin){
 			
 			$this->handle_send_reply();
@@ -820,27 +822,9 @@ class LTPLE_Inbox {
 				include($this->views . '/widget.php');
 			}
 			else{
-			
-				include($this->parent->views . '/navbar.php');
-			
+
 				include($this->views . '/panel.php');
 			}
-		}
-		else{
-			
-			echo'<div style="font-size:20px;padding:20px;margin:0;" class="alert alert-warning">';
-				
-				echo'You need to log in first...';
-				
-				echo'<div class="pull-right">';
-
-					echo'<a style="margin:0 2px;" class="btn-lg btn-success" href="'. wp_login_url( $this->parent->request->proto . $_SERVER['SERVER_NAME'].$_SERVER['REQUEST_URI'] ) .'">Login</a>';
-					
-					echo'<a style="margin:0 2px;" class="btn-lg btn-info" href="'. wp_login_url( $this->parent->urls->editor ) .'&action=register">Register</a>';
-				
-				echo'</div>';
-				
-			echo'</div>';
 		}				
 	}
 	 
@@ -1342,46 +1326,52 @@ class LTPLE_Inbox {
 			
 			// get contact form
 			
-			$this->parent->profile->tabs['contact-me']['content'] 	= '<div class="well" style="display:inline-block;width:100%;margin-top:10px;">';
+			$this->parent->profile->tabs['contact-me']['content'] 	= '<div class="col-xs-12 col-sm-7">';
 				
-				$this->parent->profile->tabs['contact-me']['content'] 	.= '<form action="' . $this->parent->urls->current . '" method="post">';
+				$this->parent->profile->tabs['contact-me']['content'] .= '<h3>Let\'s keep in touch</h3>';
+				
+				$this->parent->profile->tabs['contact-me']['content'] .= '<div class="well">';
 					
-					if( !$this->parent->user->loggedin ){
-					
-						// email address
-					
-						$this->parent->profile->tabs['contact-me']['content'] 	.= '<label>Email Address</label>';
+					$this->parent->profile->tabs['contact-me']['content'] 	.= '<form style="display:inline-block;width:100%;" action="' . $this->parent->urls->current . '" method="post">';
 						
-						$this->parent->profile->tabs['contact-me']['content'] 	.= '<input style="max-width:250px;" type="email" class="form-control" id="email" name="'.$key.'email" placeholder="my-email@gmail.com" required>';
+						if( !$this->parent->user->loggedin ){
 						
-						$this->parent->profile->tabs['contact-me']['content'] 	.= '<div style="font-size: 11px;font-style: italic;margin-bottom: 10px;">Your address will remain secret</div>';
+							// email address
 						
-						// email nickname
+							$this->parent->profile->tabs['contact-me']['content'] 	.= '<label>Email Address</label>';
+							
+							$this->parent->profile->tabs['contact-me']['content'] 	.= '<input style="max-width:250px;" type="email" class="form-control" id="email" name="'.$key.'email" placeholder="my-email@gmail.com" required>';
+							
+							$this->parent->profile->tabs['contact-me']['content'] 	.= '<div style="font-size: 11px;font-style: italic;margin-bottom: 10px;">Your address will remain secret</div>';
+							
+							// email nickname
+							
+							$this->parent->profile->tabs['contact-me']['content'] 	.= '<label>Nickname</label>';
+							
+							$this->parent->profile->tabs['contact-me']['content'] 	.= '<input style="max-width:250px;" type="text" class="form-control" id="nickname" name="'.$key.'nickname" placeholder="My Nickname" required>';
+							
+							$this->parent->profile->tabs['contact-me']['content'] 	.= '<div style="font-size: 11px;font-style: italic;margin-bottom: 10px;">Your Nickname will be seen by ' . ucfirst($this->parent->profile->user->nickname) . '</div>';
+						}
 						
-						$this->parent->profile->tabs['contact-me']['content'] 	.= '<label>Nickname</label>';
+						// message
 						
-						$this->parent->profile->tabs['contact-me']['content'] 	.= '<input style="max-width:250px;" type="text" class="form-control" id="nickname" name="'.$key.'nickname" placeholder="My Nickname" required>';
+						$this->parent->profile->tabs['contact-me']['content'] 	.= '<label>Message</label>';
 						
-						$this->parent->profile->tabs['contact-me']['content'] 	.= '<div style="font-size: 11px;font-style: italic;margin-bottom: 10px;">Your Nickname will be seen by ' . ucfirst($this->parent->profile->user->nickname) . '</div>';
-					}
-					
-					// message
-					
-					$this->parent->profile->tabs['contact-me']['content'] 	.= '<label>Message</label>';
-					
-					$this->parent->profile->tabs['contact-me']['content'] 	.= '<textarea style="height:150px;" class="form-control" name="'.$key.'message" placeholder="My message" required></textarea>';
+						$this->parent->profile->tabs['contact-me']['content'] 	.= '<textarea style="height:150px;" class="form-control" name="'.$key.'message" placeholder="My message" required></textarea>';
 
-					$this->parent->profile->tabs['contact-me']['content'] 	.= '<div style="font-size: 11px;font-style: italic;margin-bottom: 10px;">Your first message will be validated by ' . ucfirst($this->parent->profile->user->nickname) . ' and the next ones will be added to the inbox conversation</div>';
-					
-					// time token
-					
-					$this->parent->profile->tabs['contact-me']['content'] 	.= '<input type="hidden" name="'.$key.'token" value="'.$this->parent->ltple_encrypt_str(time()).'">';
-					
-					// button
-					
-					$this->parent->profile->tabs['contact-me']['content'] 	.= '<button id="contactBtn" class="pull-right btn btn-primary">Send</button>';
-					
-				$this->parent->profile->tabs['contact-me']['content'] 	.= '</form>';
+						$this->parent->profile->tabs['contact-me']['content'] 	.= '<div style="font-size: 11px;font-style: italic;margin-bottom: 10px;">Your first message will be validated by ' . ucfirst($this->parent->profile->user->nickname) . ' and the next ones will be added to the inbox conversation</div>';
+						
+						// time token
+						
+						$this->parent->profile->tabs['contact-me']['content'] 	.= '<input type="hidden" name="'.$key.'token" value="'.$this->parent->ltple_encrypt_str(time()).'">';
+						
+						// button
+						
+						$this->parent->profile->tabs['contact-me']['content'] 	.= '<button id="contactBtn" class="pull-right btn btn-primary">Send</button>';
+						
+					$this->parent->profile->tabs['contact-me']['content'] 	.= '</form>';
+				
+				$this->parent->profile->tabs['contact-me']['content'] 	.= '</div>';
 				
 			$this->parent->profile->tabs['contact-me']['content'] 	.= '</div>';
 		}
